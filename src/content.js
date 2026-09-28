@@ -375,7 +375,7 @@
     overlay = h('div', { class: 'wagx-overlay', onclick: (e) => { if (e.target === overlay && !busy) closeModal(); } });
     const panel = h('div', { class: 'wagx-panel' });
     overlay.appendChild(panel);
-    document.body.appendChild(overlay);
+    (document.body || document.documentElement).appendChild(overlay);
 
     panel.appendChild(h('div', { class: 'wagx-loading' }, 'Loading your WhatsApp groups…'));
     const S = await waitForStore(60000);
@@ -508,14 +508,15 @@
     if (document.getElementById('wagx-launcher')) return;
     const btn = h('button', { id: 'wagx-launcher', title: 'Export WhatsApp group contacts to Excel', onclick: openModal },
       h('span', { class: 'wagx-icon' }, '⬇'), ' Export Groups');
-    document.body.appendChild(btn);
+    // Attach to <html> rather than <body> so WhatsApp re-rendering the body can't remove it
+    document.documentElement.appendChild(btn);
   }
 
   // Wait for body, then add the launcher button
-  const boot = () => { if (document.body) injectLauncher(); else setTimeout(boot, 500); };
+  const boot = () => { if (document.documentElement) injectLauncher(); else setTimeout(boot, 500); };
   boot();
   // WhatsApp re-renders a lot; make sure the button survives
-  setInterval(injectLauncher, 5000);
+  setInterval(injectLauncher, 3000);
 
   // Expose a small API for power users / debugging in DevTools
   window.WAGX = {

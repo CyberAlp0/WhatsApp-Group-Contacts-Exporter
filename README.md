@@ -97,7 +97,8 @@ It also works in **Microsoft Edge** (`edge://extensions`), **Brave** (`brave://e
 ## ❓ FAQ & troubleshooting
 
 **The "Export Groups" button doesn't appear.**
-Reload WhatsApp Web (`Ctrl+R`). Then check at `chrome://extensions` that the extension is enabled and shows no errors. If it still doesn't appear, open DevTools (`F12`) → **Console** and look for `[WA Group Exporter] loaded`.
+Click the extension icon in the Chrome toolbar and choose **Open export window**. This loads the exporter into the WhatsApp tab on demand and opens the export window directly.
+If that doesn't work either, reload WhatsApp Web (`Ctrl+R`). Then check at `chrome://extensions` that the extension is enabled and shows no errors. If it still doesn't appear, open DevTools (`F12`) → **Console** and look for `[WA Group Exporter] loaded`.
 
 **Some rows say `Hidden (privacy)`.**
 WhatsApp now hides some members' phone numbers in certain groups (large groups, communities, or when a member uses the "hide phone number" privacy setting). The tool fills in the number whenever WhatsApp Web knows it, for example when the person is in your contacts or has messaged you. Otherwise only the name is exported. This is a WhatsApp privacy feature and cannot be bypassed.
