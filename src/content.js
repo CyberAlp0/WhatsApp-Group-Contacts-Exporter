@@ -31,11 +31,56 @@
   // ------------------------------------------------------------------
   // 1. Access to WhatsApp Web internal modules
   // ------------------------------------------------------------------
+  // Every lookup attempt is recorded here so failures can be diagnosed from the UI.
+  const DIAG = [];
+  const DIAG_SEEN = new Set();
+  function note(msg) { if (!DIAG_SEEN.has(msg) && DIAG.length < 200) { DIAG_SEEN.add(msg); DIAG.push(msg); } }
+
+  // WhatsApp Web ships Meta's module system. Depending on the build, modules are
+  // reachable through window.require, importNamespace or importDefault.
+  function loaders() {
+    const out = [];
+    for (const key of ['require', 'importNamespace', 'importDefault']) {
+      if (typeof window[key] === 'function') out.push([key, window[key]]);
+    }
+    return out;
+  }
+
+  const MISSING = new Set();
   function metaRequire(name) {
-    try {
-      if (typeof window.require === 'function') return window.require(name);
-    } catch (_) { /* module not found */ }
+    for (const [key, fn] of loaders()) {
+      try {
+        const m = fn(name);
+        if (m) return m;
+      } catch (e) {
+        if (!MISSING.has(key + ':' + name)) {
+          MISSING.add(key + ':' + name);
+          note(`${key}('${name}') -> ${String(e && e.message || e).slice(0, 120)}`);
+        }
+      }
+    }
     return null;
+  }
+
+  function isCollection(c) {
+    return !!(c && typeof c === 'object' && (typeof c.getModelsArray === 'function' || Array.isArray(c._models)) && typeof c.get === 'function');
+  }
+
+  // Pick a collection out of a module's exports, trying the usual export names.
+  function pickCollection(mod, names) {
+    if (!mod) return null;
+    for (const n of names) if (isCollection(mod[n])) return mod[n];
+    if (isCollection(mod.default)) return mod.default;
+    if (isCollection(mod)) return mod;
+    return null;
+  }
+
+  // List all registered module names (Meta module system debug registry).
+  function allModuleNames() {
+    const dbg = metaRequire('__debug');
+    const map = dbg && (dbg.modulesMap || dbg.modules);
+    if (map && typeof map === 'object') return Object.keys(map);
+    return [];
   }
 
   // Legacy webpack fallback (older WhatsApp Web builds)
@@ -44,6 +89,7 @@
     try {
       const chunkName = Object.keys(window).find((k) => k.startsWith('webpackChunk'));
       if (!chunkName) return null;
+      note('webpack chunk found: ' + chunkName);
       if (!webpackReq) {
         window[chunkName].push([[Symbol('wagx')], {}, (r) => { webpackReq = r; }]);
       }
@@ -56,32 +102,85 @@
           if (mod.default && predicate(mod.default)) return mod.default;
         } catch (_) { /* ignore */ }
       }
-    } catch (e) { warn('legacy lookup failed', e); }
+    } catch (e) { note('legacy webpack lookup failed: ' + (e && e.message)); }
     return null;
   }
 
+  function finishStore(S) {
+    S.ApiContact = S.ApiContact || metaRequire('WAWebApiContact');
+    S.MeUser = S.MeUser || metaRequire('WAWebUserPrefsMeUser');
+    S.GroupQuery = S.GroupQuery || metaRequire('WAWebGroupQueryJob');
+    return S;
+  }
+
   let STORE = null;
+  let lastScan = 0;
   function getStore() {
     if (STORE) return STORE;
+
+    // Strategy 1: the combined collections module
     const col = metaRequire('WAWebCollections');
-    if (col && col.Chat && col.Contact && col.GroupMetadata) {
-      STORE = {
-        Chat: col.Chat,
-        Contact: col.Contact,
-        GroupMetadata: col.GroupMetadata,
-        ApiContact: metaRequire('WAWebApiContact'),
-        WidFactory: metaRequire('WAWebWidFactory'),
-        MeUser: metaRequire('WAWebUserPrefsMeUser'),
-        GroupQuery: metaRequire('WAWebGroupQueryJob'),
-      };
+    let Chat = col && pickCollection(col, ['Chat', 'ChatCollection']);
+    let Contact = col && pickCollection(col, ['Contact', 'ContactCollection']);
+    let GroupMetadata = col && pickCollection(col, ['GroupMetadata', 'GroupMetadataCollection']);
+
+    // Strategy 2: individual collection modules
+    if (!Chat) Chat = pickCollection(metaRequire('WAWebChatCollection'), ['ChatCollection', 'Chat']);
+    if (!Contact) Contact = pickCollection(metaRequire('WAWebContactCollection'), ['ContactCollection', 'Contact']);
+    if (!GroupMetadata) GroupMetadata = pickCollection(metaRequire('WAWebGroupMetadataCollection'), ['GroupMetadataCollection', 'GroupMetadata']);
+
+    // Strategy 3: scan the module registry for anything exporting these collections
+    if ((!Chat || !Contact || !GroupMetadata) && Date.now() - lastScan > 10000) {
+      lastScan = Date.now();
+      const names = allModuleNames();
+      if (names.length) {
+        note(`module registry: ${names.length} modules`);
+        const candidates = names.filter((n) => /Collection|Store/i.test(n));
+        for (const n of candidates) {
+          let m;
+          m = metaRequire(n);
+          if (!m || typeof m !== 'object') continue;
+          if (!Chat && (isCollection(m.Chat) || isCollection(m.ChatCollection))) Chat = isCollection(m.Chat) ? m.Chat : m.ChatCollection;
+          if (!Contact && (isCollection(m.Contact) || isCollection(m.ContactCollection))) Contact = isCollection(m.Contact) ? m.Contact : m.ContactCollection;
+          if (!GroupMetadata && (isCollection(m.GroupMetadata) || isCollection(m.GroupMetadataCollection))) GroupMetadata = isCollection(m.GroupMetadata) ? m.GroupMetadata : m.GroupMetadataCollection;
+          if (Chat && Contact && GroupMetadata) { note('found collections via registry module ' + n); break; }
+        }
+      }
+    }
+
+    if (Chat && Contact && GroupMetadata) {
+      STORE = finishStore({ Chat, Contact, GroupMetadata });
       return STORE;
     }
+
+    // Strategy 4: legacy webpack builds
     const legacy = legacyFind((m) => m && m.Chat && m.Contact && m.GroupMetadata);
     if (legacy) {
-      STORE = { Chat: legacy.Chat, Contact: legacy.Contact, GroupMetadata: legacy.GroupMetadata, Conn: legacy.Conn };
+      STORE = finishStore({ Chat: legacy.Chat, Contact: legacy.Contact, GroupMetadata: legacy.GroupMetadata, Conn: legacy.Conn });
       return STORE;
     }
+    note(`partial: Chat=${!!Chat} Contact=${!!Contact} GroupMetadata=${!!GroupMetadata}`);
     return null;
+  }
+
+  function diagnostics() {
+    const names = (() => { try { return allModuleNames(); } catch (_) { return []; } })();
+    const interesting = names.filter((n) => /^WAWeb.*(Collection|Contact|GroupMetadata|Chat)$/i.test(n)).slice(0, 60);
+    const lines = [
+      'WA Group Exporter diagnostics',
+      'URL: ' + location.href,
+      'UA: ' + navigator.userAgent,
+      'WA version: ' + ((window.Debug && window.Debug.VERSION) || 'unknown'),
+      'typeof require: ' + typeof window.require + ', importNamespace: ' + typeof window.importNamespace +
+        ', importDefault: ' + typeof window.importDefault + ', __d: ' + typeof window.__d,
+      'webpack chunks: ' + (Object.keys(window).filter((k) => k.startsWith('webpackChunk')).join(',') || 'none'),
+      'registry modules: ' + names.length,
+      'store found: ' + !!STORE,
+      'matching modules: ' + (interesting.join(', ') || 'none'),
+      '--- attempts ---',
+      ...DIAG.slice(-40),
+    ];
+    return lines.join('\n');
   }
 
   function modelsOf(collection) {
@@ -375,18 +474,33 @@
     overlay = h('div', { class: 'wagx-overlay', onclick: (e) => { if (e.target === overlay && !busy) closeModal(); } });
     const panel = h('div', { class: 'wagx-panel' });
     overlay.appendChild(panel);
-    document.body.appendChild(overlay);
+    (document.body || document.documentElement).appendChild(overlay);
 
     panel.appendChild(h('div', { class: 'wagx-loading' }, 'Loading your WhatsApp groups…'));
-    const S = await waitForStore(60000);
+    const S = await waitForStore(20000);
     panel.textContent = '';
 
     if (!S) {
+      const diag = diagnostics();
+      console.warn(TAG, diag);
+      const box = h('textarea', { class: 'wagx-diag', readonly: true, dir: 'ltr' });
+      box.value = diag;
+      const copyBtn = h('button', {
+        class: 'wagx-btn wagx-primary',
+        onclick: async () => {
+          try { await navigator.clipboard.writeText(diag); copyBtn.textContent = 'Copied ✔'; }
+          catch (_) { box.select(); document.execCommand('copy'); copyBtn.textContent = 'Copied ✔'; }
+        },
+      }, 'Copy diagnostics');
       panel.append(
         h('h2', null, 'Could not read WhatsApp data'),
-        h('p', null, 'Make sure WhatsApp Web is fully loaded (your chat list is visible), then reload the page and try again. ' +
-          'If the problem continues, WhatsApp may have changed its internals — please open an issue on GitHub.'),
-        h('div', { class: 'wagx-actions' }, h('button', { class: 'wagx-btn', onclick: closeModal }, 'Close'))
+        h('p', null, 'Make sure WhatsApp Web is fully loaded (your chat list is visible), then try again. ' +
+          'If it keeps failing, WhatsApp changed its internals — copy the diagnostics below and send them to the developer.'),
+        box,
+        h('div', { class: 'wagx-actions' },
+          h('button', { class: 'wagx-btn', onclick: closeModal }, 'Close'),
+          h('button', { class: 'wagx-btn', onclick: () => { closeModal(); openModal(); } }, 'Retry'),
+          copyBtn)
       );
       return;
     }
@@ -508,14 +622,15 @@
     if (document.getElementById('wagx-launcher')) return;
     const btn = h('button', { id: 'wagx-launcher', title: 'Export WhatsApp group contacts to Excel', onclick: openModal },
       h('span', { class: 'wagx-icon' }, '⬇'), ' Export Groups');
-    document.body.appendChild(btn);
+    // Attach to <html> rather than <body> so WhatsApp re-rendering the body can't remove it
+    document.documentElement.appendChild(btn);
   }
 
   // Wait for body, then add the launcher button
-  const boot = () => { if (document.body) injectLauncher(); else setTimeout(boot, 500); };
+  const boot = () => { if (document.documentElement) injectLauncher(); else setTimeout(boot, 500); };
   boot();
   // WhatsApp re-renders a lot; make sure the button survives
-  setInterval(injectLauncher, 5000);
+  setInterval(injectLauncher, 3000);
 
   // Expose a small API for power users / debugging in DevTools
   window.WAGX = {
@@ -531,6 +646,7 @@
         apiContact: !!(S && S.ApiContact),
       };
       console.table(info);
+      console.log(diagnostics());
       return info;
     },
   };

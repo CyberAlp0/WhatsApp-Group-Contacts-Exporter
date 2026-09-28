@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "WhatsApp Group Contacts Exporter",
   "short_name": "WA Group Exporter",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Export WhatsApp Web group members (phone, country, names, contact & business flags) to Excel or CSV. 100% local.",
   "author": "CyberAlp0",
   "homepage_url": "https://github.com/CyberAlp0/whatsapp-group-contacts-exporter",
@@ -19,12 +19,25 @@
       "48": "icons/icon48.png"
     }
   },
-  "host_permissions": ["https://web.whatsapp.com/*"],
+  "permissions": [
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://web.whatsapp.com/*"
+  ],
   "content_scripts": [
     {
-      "matches": ["https://web.whatsapp.com/*"],
-      "js": ["src/countries.js", "src/xlsx-writer.js", "src/content.js"],
-      "css": ["src/styles.css"],
+      "matches": [
+        "https://web.whatsapp.com/*"
+      ],
+      "js": [
+        "src/countries.js",
+        "src/xlsx-writer.js",
+        "src/content.js"
+      ],
+      "css": [
+        "src/styles.css"
+      ],
       "run_at": "document_idle",
       "world": "MAIN"
     }

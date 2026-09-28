@@ -4,27 +4,31 @@
   <meta charset="utf-8">
   <title>WA Group Exporter</title>
   <style>
-    body { width: 280px; margin: 0; padding: 16px; font: 13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: #111b21; background: #fff; }
-    h1 { font-size: 15px; margin: 0 0 8px; }
-    ol { padding-left: 18px; margin: 8px 0 12px; color: #3b4a54; }
-    button { width: 100%; padding: 9px; border: none; border-radius: 20px; background: #00a884; color: #fff; font: 600 13px system-ui, sans-serif; cursor: pointer; }
-    button:hover { background: #008f72; }
+    body { width: 300px; margin: 0; padding: 16px; font: 13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: #111b21; background: #fff; }
+    h1 { font-size: 15px; margin: 0 0 10px; }
+    button { display: block; width: 100%; margin-top: 8px; padding: 9px; border: 1px solid #d1d7db; border-radius: 20px; background: #fff; color: #111b21; font: 600 13px system-ui, sans-serif; cursor: pointer; }
+    button.primary { background: #00a884; border-color: #00a884; color: #fff; }
+    button.primary:hover { background: #008f72; }
+    button:disabled { opacity: .5; cursor: default; }
+    #status { padding: 8px 10px; border-radius: 8px; background: #f0f2f5; color: #3b4a54; word-break: break-word; }
+    #status.ok { background: #e7f8f3; color: #04644f; }
+    #status.err { background: #fdecec; color: #a4262c; }
     .note { margin-top: 10px; font-size: 11px; color: #667781; }
     @media (prefers-color-scheme: dark) {
       body { background: #111b21; color: #e9edef; }
-      ol { color: #aebac1; }
+      button { background: #202c33; border-color: #2a3942; color: #e9edef; }
+      #status { background: #202c33; color: #aebac1; }
+      #status.ok { background: #0b3b30; color: #7ee2c5; }
+      #status.err { background: #4a1d1f; color: #ffb4b4; }
       .note { color: #8696a0; }
     }
   </style>
 </head>
 <body>
   <h1>WhatsApp Group Contacts Exporter</h1>
-  <ol>
-    <li>Open WhatsApp Web and wait until your chats load.</li>
-    <li>Click the green <b>Export Groups</b> button (bottom-right).</li>
-    <li>Pick the groups and click <b>Export</b>.</li>
-  </ol>
-  <button id="open">Open WhatsApp Web</button>
+  <div id="status">Checking WhatsApp Web…</div>
+  <button id="export" class="primary">Open export window</button>
+  <button id="reload">Open / reload WhatsApp Web</button>
   <div class="note">Everything runs locally in your browser. No data is sent anywhere.</div>
   <script src="popup.js"></script>
 </body>
