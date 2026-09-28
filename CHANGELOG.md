@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.2] — 2026-09-28
+### Fixed
+- "Could not read WhatsApp data" on newer WhatsApp Web builds: the exporter now tries several ways to locate WhatsApp's data (combined collections module, individual collection modules, module-registry scan, legacy webpack).
+### Added
+- Diagnostics box with **Copy diagnostics** and **Retry** buttons when WhatsApp data can't be read.
+
 ## [1.0.1] — 2026-09-28
 ### Fixed
 - Toolbar popup: "Open / reload WhatsApp Web" now actually reloads an already-open WhatsApp tab.

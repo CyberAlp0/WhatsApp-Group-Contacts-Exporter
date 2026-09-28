@@ -123,3 +123,16 @@ body.dark .wagx-overlay, html.dark .wagx-overlay {
   .wagx-options { grid-template-columns: 1fr; }
   #wagx-launcher { right: 12px; bottom: 12px; }
 }
+.wagx-diag {
+  width: 100%;
+  height: 160px;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 8px;
+  border: 1px solid var(--wagx-line);
+  border-radius: 8px;
+  background: var(--wagx-input);
+  color: var(--wagx-fg);
+  font: 11px/1.4 ui-monospace, Consolas, monospace;
+  white-space: pre;
+}
