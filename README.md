@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="icons/icon128.png" width="96" alt="logo">
+<img src="docs/social-preview.png" alt="WhatsApp Contacts & Groups Exporter: export group members, chats and contacts from WhatsApp Web to Excel or CSV" width="100%">
 
 # WhatsApp Contacts & Groups Exporter
 
