@@ -2,11 +2,11 @@
 
 <img src="icons/icon128.png" width="96" alt="logo">
 
-# WhatsApp Group Contacts Exporter
+# WhatsApp Contacts & Groups Exporter
 
-**Export the members of your WhatsApp groups to Excel with one click, straight from WhatsApp Web in Chrome.**
+**Export your WhatsApp contacts, the people you chat with, and the members of your groups to Excel with one click, straight from WhatsApp Web in Chrome.**
 
-Phone number · Country · Public name · Saved name · Group · Contact & Business flags
+Phone number · Country · Public name · Saved name · Group / Source · Contact & Business flags · Last chat
 
 ![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-00a884)
 ![No dependencies](https://img.shields.io/badge/dependencies-0-00a884)
@@ -18,17 +18,27 @@ Phone number · Country · Public name · Saved name · Group · Contact & Busin
 
 ## ✨ Features
 
-- **One-click export**: a green **Export Groups** button appears inside WhatsApp Web.
+**Two export modes, in one window:**
+
+| Mode | What it exports |
+|---|---|
+| **Group members** | Every participant of the groups you pick |
+| **Chats & contacts** | Everyone you have an individual chat with (archived chats included), and optionally every saved contact who uses WhatsApp |
+
+- **One-click export**: a green **WA Export** button appears inside WhatsApp Web.
 - **Pick any groups**: search, select all or clear, and see member counts.
 - **Excel (.xlsx) or CSV**: Arabic and emoji names stay intact.
-- **Two layouts**: one combined sheet, or one sheet per group, plus a **Summary** sheet.
-- **Remove duplicates**: a number that appears in several groups is exported once, and its group names are merged (`Group A | Group B`).
-- **Exclude your own number** (on by default).
-- **Sorted the smart way**: saved contacts first, then everyone else alphabetically.
+- **Group layouts**: one combined sheet, or one sheet per group.
+- **Summary sheet**: totals, plus a per-country breakdown for contacts.
+- **Remove duplicates**: each number appears once. The group names or sources it came from are merged.
+- **Exclude your own number** (on by default). Broadcast lists and channels are always skipped.
+- **Smart sorting**: groups list saved contacts first, and chats list the most recent conversation first.
 - **100% local**: nothing is uploaded, and there is no server, analytics or tracking. The file is built in your browser.
 - **No dependencies**: it ships its own small XLSX writer.
 
 ## 📊 Output columns
+
+**Group members**
 
 | Column | Example | Source |
 |---|---|---|
@@ -41,9 +51,13 @@ Phone number · Country · Public name · Saved name · Group · Contact & Busin
 | Is My Contact | `True` / `False` | Saved in your contacts? |
 | Is Business | `True` / `False` | WhatsApp Business account? |
 
+**Chats & contacts**: the same columns, except that *Group Name* becomes **Source** (`Chat`, `Saved contact` or both), plus a **Last Chat** column (`2026-09-27 20:13`).
+
 A sample file is included: [`docs/sample-output.xlsx`](docs/sample-output.xlsx).
 
-![Screenshot](docs/screenshot.png)
+| Group members | Chats & contacts |
+|---|---|
+| ![Groups](docs/screenshot.png) | ![Contacts](docs/screenshot-contacts.png) |
 
 ---
 
@@ -81,7 +95,10 @@ It also works in **Microsoft Edge** (`edge://extensions`), **Brave** (`brave://e
 
 1. Open **[web.whatsapp.com](https://web.whatsapp.com)** and log in by scanning the QR code with your phone.
 2. Wait until your chat list has fully loaded.
-3. Click the green **⬇ Export Groups** button in the bottom-right corner.
+3. Click the green **⬇ WA Export** button in the bottom-right corner, or click the extension icon and then **Open export window**.
+
+**To export group members** (the *Group members* tab):
+
 4. Tick the groups you want. Use the search box to filter.
 5. Choose the options:
    - **Layout**: *One sheet* (all groups together) or *One sheet per group*
@@ -90,13 +107,18 @@ It also works in **Microsoft Edge** (`edge://extensions`), **Brave** (`brave://e
    - **Exclude my own number**
 6. Click **Export**. The file downloads as `WhatsApp_Group_Contacts_YYYY-MM-DD_HH-mm.xlsx`.
 
+**To export chats & contacts** (the *Chats & contacts* tab):
+
+4. Tick **People I have chatted with**, **All saved contacts on WhatsApp**, or both.
+5. Pick the format and click **Export**. The file downloads as `WhatsApp_Contacts_YYYY-MM-DD_HH-mm.xlsx`.
+
 > 💡 **Large exports:** the tool reads groups one by one with a short pause between them. Keep the tab open until the progress bar finishes.
 
 ---
 
 ## ❓ FAQ & troubleshooting
 
-**The "Export Groups" button doesn't appear.**
+**The "WA Export" button doesn't appear.**
 Click the extension icon in the Chrome toolbar and choose **Open export window**. This loads the exporter into the WhatsApp tab on demand and opens the export window directly.
 If that doesn't work either, reload WhatsApp Web (`Ctrl+R`). Then check at `chrome://extensions` that the extension is enabled and shows no errors. If it still doesn't appear, open DevTools (`F12`) → **Console** and look for `[WA Group Exporter] loaded`.
 

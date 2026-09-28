@@ -1,16 +1,16 @@
 {
   "manifest_version": 3,
-  "name": "WhatsApp Group Contacts Exporter",
-  "short_name": "WA Group Exporter",
-  "version": "1.0.2",
-  "description": "Export WhatsApp Web group members (phone, country, names, contact & business flags) to Excel or CSV. 100% local.",
+  "name": "WhatsApp Contacts & Groups Exporter",
+  "short_name": "WA Exporter",
+  "version": "1.1.0",
+  "description": "Export WhatsApp Web contacts, chats and group members (phone, country, names, contact & business flags) to Excel or CSV. 100% local.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "WhatsApp Group Contacts Exporter",
+    "default_title": "WhatsApp Contacts & Groups Exporter",
     "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",

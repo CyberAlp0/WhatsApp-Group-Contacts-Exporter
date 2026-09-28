@@ -136,3 +136,18 @@ body.dark .wagx-overlay, html.dark .wagx-overlay {
   font: 11px/1.4 ui-monospace, Consolas, monospace;
   white-space: pre;
 }
+.wagx-tabs { display: flex; gap: 4px; padding: 4px; border-radius: 10px; background: var(--wagx-input); }
+.wagx-tab {
+  flex: 1; padding: 8px 10px; border: none; border-radius: 8px; background: transparent;
+  color: var(--wagx-muted); font: 600 13px system-ui, sans-serif; cursor: pointer;
+}
+.wagx-tab-active { background: var(--wagx-bg); color: var(--wagx-fg); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.wagx-sources { display: flex; flex-direction: column; border: 1px solid var(--wagx-line); border-radius: 8px; }
+.wagx-source { display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid var(--wagx-line); cursor: pointer; }
+.wagx-source:last-child { border-bottom: none; }
+.wagx-source:hover { background: var(--wagx-hover); }
+.wagx-source input { accent-color: var(--wagx-accent); width: 16px; height: 16px; flex: none; }
+.wagx-source-text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.wagx-source-title { font-weight: 600; }
+.wagx-source-count { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--wagx-accent); }
+.wagx-hint { font-size: 12px; }

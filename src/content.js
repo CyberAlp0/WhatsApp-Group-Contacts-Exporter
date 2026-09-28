@@ -391,6 +391,114 @@
   }
 
   // ------------------------------------------------------------------
+  // 2b. Individual chats & saved contacts
+  // ------------------------------------------------------------------
+  const CONTACT_HEADERS = [
+    'Country Code', 'Country', 'Phone Number', 'Public Display Name', 'Saved Name',
+    'Source', 'Is My Contact', 'Is Business', 'Last Chat',
+  ];
+  const CONTACT_WIDTHS = [14, 24, 20, 30, 26, 24, 14, 12, 18];
+  const PERSON_SERVERS = new Set(['c.us', 's.whatsapp.net', 'lid']);
+
+  function isPersonChat(chat) {
+    try {
+      return !!chat && !isGroupChat(chat) && PERSON_SERVERS.has(widServer(chat.id)) && !chat.isNewsletter && !chat.isBroadcast;
+    } catch (_) { return false; }
+  }
+
+  function isSavedPerson(ct) {
+    try {
+      return !!ct && ct.isMyContact && !ct.isGroup && PERSON_SERVERS.has(widServer(ct.id));
+    } catch (_) { return false; }
+  }
+
+  function fmtDate(ts) {
+    if (!ts) return '';
+    const d = new Date(ts * 1000);
+    if (isNaN(d)) return '';
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+
+  function listPersonChats(S) { return modelsOf(S.Chat).filter(isPersonChat); }
+  function listSavedContacts(S) { return modelsOf(S.Contact).filter(isSavedPerson); }
+
+  async function extractContacts(S, opts, onProgress) {
+    const me = opts.excludeMe ? getMyNumber(S) : '';
+    const byKey = new Map();
+
+    const add = (wid, source, ts, skipIfHidden) => {
+      const base = participantRow(S, { id: wid }, source);
+      if (me && base.digits === me) return;
+      if (!base.digits && skipIfHidden) return;
+      const key = base.digits || widStr(wid);
+      const existing = byKey.get(key);
+      if (existing) {
+        if (!existing.sources.includes(source)) existing.sources.push(source);
+        existing.ts = Math.max(existing.ts, ts || 0);
+        return;
+      }
+      byKey.set(key, { ...base, sources: [source], ts: ts || 0 });
+    };
+
+    const chats = opts.chats ? listPersonChats(S) : [];
+    const saved = opts.saved ? listSavedContacts(S) : [];
+    const total = chats.length + saved.length;
+    let i = 0;
+
+    for (const chat of chats) {
+      try { add(chat.id, 'Chat', Number(chat.t) || 0, false); } catch (e) { warn('chat failed', e); }
+      if (++i % 200 === 0) { onProgress(i, total, 'chats'); await sleep(0); }
+    }
+    for (const ct of saved) {
+      // Saved contacts can appear twice (phone-number entry + private LID entry);
+      // unresolved LID entries are skipped to avoid "Hidden" duplicates.
+      try { add(ct.id, 'Saved contact', 0, widServer(ct.id) === 'lid'); } catch (e) { warn('contact failed', e); }
+      if (++i % 200 === 0) { onProgress(i, total, 'contacts'); await sleep(0); }
+    }
+    onProgress(total, total, '');
+
+    const entries = [...byKey.values()].map((e) => {
+      const row = e.row.slice(0, 5).concat([e.sources.join(', '), e.row[6], e.row[7], fmtDate(e.ts)]);
+      return { ...e, row };
+    });
+    // Most recent conversations first, then saved-only contacts alphabetically
+    entries.sort((a, b) => (b.ts - a.ts) || a.sortName.localeCompare(b.sortName));
+    return { entries, chatCount: chats.length, savedCount: saved.length };
+  }
+
+  function buildContactsOutput(result, format) {
+    const stamp = timestamp();
+    const rows = [CONTACT_HEADERS, ...result.entries.map((e) => e.row)];
+    if (format === 'csv') {
+      const csvCell = (v) => {
+        const s = String(v ?? '');
+        return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      };
+      const blob = new Blob(['﻿' + rows.map((r) => r.map(csvCell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+      return { blob, filename: `WhatsApp_Contacts_${stamp}.csv`, count: result.entries.length };
+    }
+    const e = result.entries;
+    const summary = [
+      ['Metric', 'Count'],
+      ['Total exported', e.length],
+      ['From individual chats', e.filter((x) => x.sources.includes('Chat')).length],
+      ['Saved contacts', e.filter((x) => x.isMyContact).length],
+      ['Not in my contacts', e.filter((x) => !x.isMyContact).length],
+      ['Business accounts', e.filter((x) => x.row[7] === 'True').length],
+      ['Hidden numbers', e.filter((x) => !x.digits).length],
+    ];
+    const byCountry = new Map();
+    e.forEach((x) => byCountry.set(x.row[1], (byCountry.get(x.row[1]) || 0) + 1));
+    summary.push([], ['Country', 'Count'], ...[...byCountry.entries()].sort((a, b) => b[1] - a[1]));
+    const blob = WAGX_XLSX.build([
+      { name: 'Contacts', rows, widths: CONTACT_WIDTHS },
+      { name: 'Summary', rows: summary, widths: [28, 12] },
+    ]);
+    return { blob, filename: `WhatsApp_Contacts_${stamp}.xlsx`, count: e.length };
+  }
+
+  // ------------------------------------------------------------------
   // 3. File output
   // ------------------------------------------------------------------
   function timestamp() {
@@ -420,7 +528,7 @@
         return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
       };
       const lines = [HEADERS, ...entries.map((e) => e.row)].map((r) => r.map(csvCell).join(','));
-      const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+      const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
       return { blob, filename: `WhatsApp_Group_Contacts_${stamp}.csv`, count: entries.length };
     }
 
@@ -476,7 +584,7 @@
     overlay.appendChild(panel);
     (document.body || document.documentElement).appendChild(overlay);
 
-    panel.appendChild(h('div', { class: 'wagx-loading' }, 'Loading your WhatsApp groups…'));
+    panel.appendChild(h('div', { class: 'wagx-loading' }, 'Loading your WhatsApp data…'));
     const S = await waitForStore(20000);
     panel.textContent = '';
 
@@ -505,12 +613,102 @@
       return;
     }
 
-    const groups = modelsOf(S.Chat)
-      .filter(isGroupChat)
-      .map((chat) => ({ chat, title: chatTitle(chat), selected: false, row: null }))
-      .sort((a, b) => a.title.localeCompare(b.title));
+    renderMode(S, panel, 'groups');
+  }
 
-    renderPicker(S, panel, groups);
+  function renderMode(S, panel, mode) {
+    if (busy) return;
+    panel.textContent = '';
+    const tab = (id, label) => h('button', {
+      class: 'wagx-tab' + (mode === id ? ' wagx-tab-active' : ''),
+      onclick: () => { if (mode !== id) renderMode(S, panel, id); },
+    }, label);
+    panel.append(
+      h('div', { class: 'wagx-header' },
+        h('h2', null, 'WhatsApp Exporter'),
+        h('button', { class: 'wagx-x', title: 'Close', onclick: () => { if (!busy) closeModal(); } }, '×')),
+      h('div', { class: 'wagx-tabs' }, tab('groups', 'Group members'), tab('contacts', 'Chats & contacts'))
+    );
+    if (mode === 'contacts') {
+      renderContacts(S, panel);
+    } else {
+      const groups = modelsOf(S.Chat)
+        .filter(isGroupChat)
+        .map((chat) => ({ chat, title: chatTitle(chat), selected: false, row: null }))
+        .sort((a, b) => a.title.localeCompare(b.title));
+      renderPicker(S, panel, groups);
+    }
+  }
+
+  function renderContacts(S, panel) {
+    const nChats = listPersonChats(S).length;
+    const nSaved = listSavedContacts(S).length;
+
+    const chatsCb = h('input', { type: 'checkbox', checked: true, onchange: () => update() });
+    const savedCb = h('input', { type: 'checkbox', onchange: () => update() });
+    const excludeMeCb = h('input', { type: 'checkbox', checked: true });
+    const formatSel = h('select', { class: 'wagx-select' },
+      h('option', { value: 'xlsx' }, 'Excel (.xlsx)'),
+      h('option', { value: 'csv' }, 'CSV (.csv)'));
+
+    const progressBar = h('div', { class: 'wagx-progress-bar' });
+    const progress = h('div', { class: 'wagx-progress', style: 'display:none' }, progressBar);
+    const status = h('div', { class: 'wagx-status', dir: 'auto' });
+    const countLabel = h('span', { class: 'wagx-count' });
+
+    const exportBtn = h('button', {
+      class: 'wagx-btn wagx-primary',
+      onclick: async () => {
+        busy = true; update(); closeBtn.disabled = true;
+        progress.style.display = '';
+        try {
+          const result = await extractContacts(S, {
+            chats: chatsCb.checked, saved: savedCb.checked, excludeMe: excludeMeCb.checked,
+          }, (i, total, what) => {
+            progressBar.style.width = `${total ? Math.round((i / total) * 100) : 100}%`;
+            status.textContent = what ? `Reading ${what}… ${i}/${total}` : 'Building file…';
+          });
+          const out = buildContactsOutput(result, formatSel.value);
+          download(out.blob, out.filename);
+          const hidden = result.entries.filter((e) => !e.digits).length;
+          status.textContent = `Done — exported ${out.count} people to ${out.filename}.` +
+            (hidden ? ` ${hidden} have hidden numbers.` : '');
+        } catch (e) {
+          warn(e);
+          status.textContent = 'Export failed: ' + (e && e.message ? e.message : e);
+        } finally {
+          busy = false; closeBtn.disabled = false; update();
+        }
+      },
+    }, 'Export');
+    const closeBtn = h('button', { class: 'wagx-btn', onclick: () => { if (!busy) closeModal(); } }, 'Close');
+
+    function update() {
+      const n = (chatsCb.checked ? nChats : 0) + (savedCb.checked ? nSaved : 0);
+      countLabel.textContent = n ? `up to ${n.toLocaleString()} people` : 'Choose at least one source';
+      exportBtn.disabled = busy || n === 0;
+    }
+
+    const source = (cb, title, desc, count) => h('label', { class: 'wagx-source' }, cb,
+      h('span', { class: 'wagx-source-text' },
+        h('span', { class: 'wagx-source-title' }, title),
+        h('span', { class: 'wagx-meta' }, desc)),
+      h('span', { class: 'wagx-source-count' }, count.toLocaleString()));
+
+    panel.append(
+      h('p', null, 'Export everyone you have a one-to-one chat with, and optionally every saved contact that uses WhatsApp.'),
+      h('div', { class: 'wagx-sources' },
+        source(chatsCb, 'People I have chatted with', 'Every individual chat in WhatsApp Web, including archived chats', nChats),
+        source(savedCb, 'All saved contacts on WhatsApp', 'Your phone book contacts who use WhatsApp, even with no chat', nSaved)),
+      h('div', { class: 'wagx-options' },
+        h('label', null, 'Format ', formatSel),
+        h('label', { class: 'wagx-check' }, excludeMeCb, ' Exclude my own number')),
+      h('p', { class: 'wagx-hint' }, 'Note: only chats synced to WhatsApp Web are included. Very old chats you deleted from your phone won\'t appear.'),
+      progress,
+      status,
+      h('div', { class: 'wagx-actions' }, countLabel, closeBtn, exportBtn)
+    );
+    update();
   }
 
   let busy = false;
@@ -597,9 +795,6 @@
     const closeBtn = h('button', { class: 'wagx-btn', onclick: () => { if (!busy) closeModal(); } }, 'Close');
 
     panel.append(
-      h('div', { class: 'wagx-header' },
-        h('h2', null, 'Export Group Contacts'),
-        h('button', { class: 'wagx-x', title: 'Close', onclick: () => { if (!busy) closeModal(); } }, '×')),
       h('div', { class: 'wagx-toolbar' },
         search,
         h('button', { class: 'wagx-link', onclick: () => setVisible(true) }, 'Select all'),
@@ -620,8 +815,8 @@
 
   function injectLauncher() {
     if (document.getElementById('wagx-launcher')) return;
-    const btn = h('button', { id: 'wagx-launcher', title: 'Export WhatsApp group contacts to Excel', onclick: openModal },
-      h('span', { class: 'wagx-icon' }, '⬇'), ' Export Groups');
+    const btn = h('button', { id: 'wagx-launcher', title: 'Export WhatsApp contacts & group members to Excel', onclick: openModal },
+      h('span', { class: 'wagx-icon' }, '⬇'), ' WA Export');
     // Attach to <html> rather than <body> so WhatsApp re-rendering the body can't remove it
     document.documentElement.appendChild(btn);
   }
@@ -635,6 +830,7 @@
   // Expose a small API for power users / debugging in DevTools
   window.WAGX = {
     open: openModal,
+    openContacts: async () => { await openModal(); const S = getStore(); const panel = overlay && overlay.querySelector('.wagx-panel'); if (S && panel) renderMode(S, panel, 'contacts'); },
     diagnose() {
       const S = getStore();
       const info = {
@@ -642,6 +838,8 @@
         storeFound: !!S,
         chats: S ? modelsOf(S.Chat).length : 0,
         groups: S ? modelsOf(S.Chat).filter(isGroupChat).length : 0,
+        personChats: S ? listPersonChats(S).length : 0,
+        savedContacts: S ? listSavedContacts(S).length : 0,
         contacts: S ? modelsOf(S.Contact).length : 0,
         apiContact: !!(S && S.ApiContact),
       };
@@ -650,5 +848,5 @@
       return info;
     },
   };
-  log('loaded — click "Export Groups" (bottom-right) or run WAGX.open()');
+  log('loaded — click "WA Export" (bottom-right) or run WAGX.open()');
 })();

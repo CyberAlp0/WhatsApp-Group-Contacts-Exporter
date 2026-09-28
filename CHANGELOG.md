@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.1.0] — 2026-09-28
+### Added
+- **Chats & contacts** export mode (new tab next to *Group members*):
+  - Everyone you have an individual chat with (including archived chats).
+  - Optionally, every saved phone-book contact that uses WhatsApp, even with no chat.
+  - Columns: Country Code, Country, Phone Number, Public Display Name, Saved Name, Source, Is My Contact, Is Business, Last Chat.
+  - Sorted by most recent conversation; merged by phone number; Summary sheet with totals and a per-country breakdown.
+  - Broadcast lists, channels and your own number are excluded.
+### Changed
+- Launcher button renamed to **WA Export**; extension renamed to *WhatsApp Contacts & Groups Exporter*.
+
 ## [1.0.2] — 2026-09-28
 ### Fixed
 - "Could not read WhatsApp data" on newer WhatsApp Web builds: the exporter now tries several ways to locate WhatsApp's data (combined collections module, individual collection modules, module-registry scan, legacy webpack).
