@@ -67,14 +67,14 @@ The extension isn't on the Chrome Web Store, so you install it in *Developer mod
 
 ### Option A: download a release (easiest)
 
-1. Go to the [**Releases**](../../releases) page and download `wa-group-exporter-x.y.z.zip`.
+1. Go to the [**Releases**](https://github.com/CyberAlp0/whatsapp-group-contacts-exporter/releases) page and download `wa-group-exporter-x.y.z.zip`.
 2. **Unzip** it into a folder you'll keep. Don't delete that folder later, or Chrome will remove the extension.
 3. Continue with **Load into Chrome** below.
 
 ### Option B: clone the repository
 
 ```bash
-git clone https://github.com/<your-username>/whatsapp-group-contacts-exporter.git
+git clone https://github.com/CyberAlp0/whatsapp-group-contacts-exporter.git
 ```
 
 Or click **Code → Download ZIP** on GitHub and unzip it.
@@ -135,7 +135,7 @@ Open that group once in WhatsApp Web so it syncs, then export again.
 Use the **.xlsx** format, or in Excel go to *Data → From Text/CSV* and choose **UTF-8**.
 
 **It stopped working after a WhatsApp update.**
-WhatsApp Web changes its internals from time to time. Open DevTools → Console, run `WAGX.diagnose()`, and [open an issue](../../issues) with the output.
+WhatsApp Web changes its internals from time to time. Open DevTools → Console, run `WAGX.diagnose()`, and [open an issue](https://github.com/CyberAlp0/whatsapp-group-contacts-exporter/issues) with the output.
 
 ---
 
